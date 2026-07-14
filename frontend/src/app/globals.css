@@ -1,0 +1,37 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400..700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+}
+
+html,
+body {
+  background-color: #0f1015;
+  color: #e8e9ef;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin scrollbar for the dark theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2c38;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #363948;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
