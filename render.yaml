@@ -1,0 +1,52 @@
+# Render Blueprint — deploy the FastAPI backend as a free web service.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# In the Render dashboard: New + -> Blueprint -> pick this repo.
+# Render reads this file and creates the service automatically. You will be
+# prompted to fill in the values marked `sync: false` (they are NOT stored in
+# git). JWT_SECRET is generated for you.
+services:
+  - type: web
+    name: video-platform-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      # --- Database: paste your Neon connection string here (dashboard) ---
+      - key: DATABASE_URL
+        sync: false
+      # --- JWT: Render generates a strong random secret automatically ---
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRE_MINUTES
+        value: "1440"
+      # --- Google OAuth (from Google Cloud Console) ---
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Must match the value you register in Google Cloud Console.
+      # After first deploy, set this to:
+      #   https://<your-service>.onrender.com/api/auth/google/callback
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      # --- Google Drive folder IDs ---
+      - key: GOOGLE_DRIVE_FOLDER_VIDEO
+        sync: false
+      - key: GOOGLE_DRIVE_FOLDER_DOCUMENT
+        sync: false
+      - key: GOOGLE_DRIVE_ROOT_FOLDER
+        sync: false
+      # --- CORS: your deployed frontend origin (e.g. Vercel URL) ---
+      - key: FRONTEND_ORIGIN
+        sync: false
+      # --- Default admin (created only on first run) ---
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
