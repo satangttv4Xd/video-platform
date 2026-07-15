@@ -120,9 +120,12 @@ def _load_credentials(db: Session) -> Credentials:
         client_id=settings.GOOGLE_CLIENT_ID,
         client_secret=settings.GOOGLE_CLIENT_SECRET,
         scopes=SCOPES,
+        # google-auth needs a naive UTC expiry to know when the token is stale.
+        # Without it, creds.valid is always True and the token never refreshes.
+        expiry=token.expires_at.replace(tzinfo=None) if token.expires_at else None,
     )
-    # Refresh if expired
-    if not creds.valid:
+    # Refresh if expired (or if we don't know the expiry) using the refresh_token.
+    if not creds.valid or creds.expiry is None:
         creds.refresh(GoogleRequest())
         _store_credentials(db, creds)
     return creds
