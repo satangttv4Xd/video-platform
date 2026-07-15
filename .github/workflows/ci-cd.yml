@@ -1,0 +1,100 @@
+name: CI/CD
+
+# Runs tests on every push/PR, and (only on main) triggers the
+# production deploys for the FastAPI backend (Render) and the
+# Next.js frontend (Vercel).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------
+  # 1) Backend: install deps + smoke-test that the app imports and
+  #    the FastAPI routes come up. Uses SQLite so no DB is needed.
+  # ---------------------------------------------------------------
+  backend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Smoke test (import app + hit health endpoints)
+        env:
+          DATABASE_URL: "sqlite:///./ci.db"
+          JWT_SECRET: "ci-only-secret"
+          FRONTEND_ORIGIN: "http://localhost:3000"
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from app.main import app
+
+          with TestClient(app) as client:          # triggers lifespan (create tables + seed admin)
+              assert client.get("/").json()["status"] == "ok"
+              assert client.get("/api/health").json()["status"] == "healthy"
+          print("Backend smoke test passed.")
+          PY
+
+  # ---------------------------------------------------------------
+  # 2) Frontend: type-check + production build.
+  # ---------------------------------------------------------------
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  # ---------------------------------------------------------------
+  # 3) Deploy — only on push to main, and only after both the
+  #    backend test and frontend build succeed. Deploys are fired
+  #    via provider "deploy hooks" (a secret URL you paste into the
+  #    repo's GitHub Secrets), so no cloud CLI or token is needed.
+  # ---------------------------------------------------------------
+  deploy:
+    needs: [backend-test, frontend-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render (backend) deploy
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK_URL not set — skipping backend deploy."
+          else
+            curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+            echo "Render deploy triggered."
+          fi
+
+      - name: Trigger Vercel (frontend) deploy
+        run: |
+          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}" ]; then
+            echo "::warning::VERCEL_DEPLOY_HOOK_URL not set — skipping frontend deploy."
+          else
+            curl -fsSL -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"
+            echo "Vercel deploy triggered."
+          fi
